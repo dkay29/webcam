@@ -11,8 +11,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 public class S3Config {
 
     // Replace with your own credentials or fetch them from environment variables
-    private final String accessKeyId = "AKIAUQ4L3GPOZY5JLZV7";
-    private final String secretAccessKey = "kcR6eL/rN41L3rxkze0q5eR36mC2j2z6tYFZGKDY";
+    private final String accessKeyId = "";
+    private final String secretAccessKey = "";
     private final Region region = Region.US_EAST_2;  // Replace with your region
 
     @Bean
