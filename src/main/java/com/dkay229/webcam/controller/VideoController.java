@@ -5,15 +5,18 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfByte;
 import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 import org.opencv.videoio.VideoCapture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutorService;
@@ -47,51 +50,44 @@ public class VideoController implements DisposableBean {
         }
     }
 
-    @GetMapping(value = "/stream-video", produces = "multipart/x-mixed-replace;boundary=frame")
+    @GetMapping(value = "/video-stream", produces = MediaType.IMAGE_JPEG_VALUE)
     public void streamVideo(HttpServletResponse response) throws IOException {
-        response.setContentType("multipart/x-mixed-replace;boundary=frame");
+        response.setContentType(MediaType.IMAGE_JPEG_VALUE);
+        response.setHeader("Cache-Control", "no-store");
 
-        logger.info("Streaming video feed");
-        executor.submit(() -> {
-            try {
-                try (OutputStream out = response.getOutputStream()) {
-                    Mat frame = new Mat();
+        Mat frame = new Mat();
+        MatOfByte matOfByte = new MatOfByte();
 
-                    while (true) {
-                        if (camera.read(frame)) {
-                            logger.info("Converting frame to JPEG");
-                            byte[] frameBytes = convertMatToJpeg(frame);
-                            logger.info("Write the frame as part of the MJPEG stream");
-                            out.write(("--frame\r\n").getBytes());
-                            out.write(("Content-Type: image/jpeg\r\n\r\n").getBytes());
-                            out.write(frameBytes);
-                            out.write("\r\n".getBytes());
-                            out.flush();
-                            logger.info("Sleeping for 100ms for approximately 10 FPS");
-                            Thread.sleep(100); // Approximately 10 FPS
-                        } else {
-                            logger.warn("Error: Could not read frame from camera.");
-                        }
+        while (true) {
+            logger.info("Capturing video frame");
+            if (camera.read(frame)) {
+                // Convert the frame to RGB
+                logger.info("Converting frame to RGB");
+                Mat frameRGB = new Mat();
+                Imgproc.cvtColor(frame, frameRGB, Imgproc.COLOR_BGR2RGB);
 
-                        if (response.isCommitted()) {
-                            logger.info("Client disconnected. Stopping video stream.");
-                            break;
-                        }
-                    }
-                } catch (IOException e) {
-                    logger.error("Client disconnected or error streaming video: ",e);
+                // Encode the frame as a JPEG image in MatOfByte
+                logger.info("Encoding frame as JPEG image");
+                Imgcodecs.imencode(".jpg", frameRGB, matOfByte);
+
+                // Write the byte array to the response
+                logger.info("Writing byte array to response");
+                byte[] byteArray = matOfByte.toArray();
+                response.getOutputStream().write(byteArray);
+                response.getOutputStream().flush();
+                logger.info("Frame sent to client");
+                // Reset the stream for the next frame
+                matOfByte.release();
+
+                // Add a 10ms pause to control the frame rate
+                try {
+                    Thread.sleep(100);
                 } catch (InterruptedException e) {
-                    logger.error("Stream interrupted",e);
+                    e.printStackTrace();
                 }
-            } catch (Exception e) {
-                logger.error("Error streaming video", e);
+            } else {
+                throw new IOException("Failed to capture video frame");
             }
-        });
-    }
-    // Utility method to convert OpenCV Mat object to JPEG byte array
-    private byte[] convertMatToJpeg(Mat frame) throws IOException {
-        MatOfByte mob = new MatOfByte();
-        Imgcodecs.imencode(".jpg", frame, mob);
-        return mob.toArray();
+        }
     }
 }

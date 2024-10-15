@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Feed</title>
+</head>
+<body>
+<h1>Live Camera Feed</h1>
+<img id="cameraFeed" src="/cjpg-feed" alt="Camera Feed" width="640" height="480"/>
+
+<script>
+    function updateFeed() {
+        document.getElementById('cameraFeed').src = "/jpg-feed?" + new Date().getTime(); // Add timestamp to prevent caching
+    }
+
+    // Update feed every 50 milliseconds (20 FPS)
+    setInterval(updateFeed, 50);
+</script>
+</body>
+</html>
